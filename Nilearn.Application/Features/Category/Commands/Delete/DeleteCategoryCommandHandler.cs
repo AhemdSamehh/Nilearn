@@ -1,0 +1,41 @@
+using MediatR;
+using Microsoft.Extensions.Logging;
+using Nilearn.Application.Common;
+using Nilearn.Domain.Interfaces;
+using Nilearn.Application.Common.Exceptions;
+
+namespace Nilearn.Application.Features.Category.Commands.DeleteCategory;
+
+internal sealed class DeleteCategoryCommandHandler : IRequestHandler<DeleteCategoryCommand, Result<string>>
+{
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly ILogger<DeleteCategoryCommandHandler> _logger;
+
+    public DeleteCategoryCommandHandler(IUnitOfWork unitOfWork, ILogger<DeleteCategoryCommandHandler> logger)
+    {
+        _unitOfWork = unitOfWork;
+        _logger = logger;
+    }
+
+    public async Task<Result<string>> Handle(DeleteCategoryCommand request, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Deleting category with id: {Id}", request.Id);
+
+        var existing = await _unitOfWork.CategoryRepository.GetByIdAsync(request.Id, cancellationToken);
+        if (existing is null)
+        {
+            throw new NotFoundException("Category", request.Id);
+        }
+
+        var deleted = await _unitOfWork.CategoryRepository.DeleteAsync(request.Id, cancellationToken);
+        if (!deleted)
+        {
+            throw new NotFoundException("Category", request.Id);
+        }
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Category with id {Id} deleted with success.", request.Id);
+        return Result<string>.SuccessResponse(message: "Category deleted successfully.");
+    }
+}
